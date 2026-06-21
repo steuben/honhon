@@ -115,11 +115,39 @@
   // Handle assessment completion
   async function handleAssessmentComplete() {
     if (!flowState) return;
-    // Calculate score from current progress
-    const progress = flowState.getProgress();
-    const score = progress ? progress.accuracy : 0;
-    await flowState.completeLesson(score);
-    await handlePhaseComplete();
+    try {
+      // Capture the assessment score before advancing
+      const progress = flowState.getProgress();
+      const score = progress ? progress.accuracy : 0;
+
+      // Advance assessment → review FIRST so the Review screen is shown.
+      // (completeLesson sets the phase to 'review', which would make
+      // completePhase find no next phase and exit the lesson entirely.)
+      await handlePhaseComplete();
+
+      // Persist the score and pass/fail state. The score is saved even on a
+      // failing grade, so the user can continue and redo it later.
+      await flowState.completeLesson(score);
+      overallProgress = flowState.getOverallProgress();
+    } catch (err) {
+      console.error('Assessment completion error:', err);
+      error = err instanceof Error ? err.message : 'Bewertung konnte nicht abgeschlossen werden';
+    }
+  }
+
+  // Handle review (final phase) completion: mark the lesson fully complete,
+  // then return to the lesson overview.
+  async function handleReviewComplete() {
+    if (!flowState) {
+      if (onExit) onExit();
+      return;
+    }
+    try {
+      await flowState.completePhase();
+    } catch (err) {
+      console.warn('Review completion error:', err);
+    }
+    if (onExit) onExit();
   }
 
   // Handle pause
@@ -342,7 +370,7 @@
         <ReviewPhase
           {lesson}
           progress={flowState.getProgress()}
-          onComplete={confirmExit}
+          onComplete={handleReviewComplete}
         />
       {/if}
     {/if}

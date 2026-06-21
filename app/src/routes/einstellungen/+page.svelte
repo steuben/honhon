@@ -1,3 +1,7 @@
+<script lang="ts">
+  import { base } from '$app/paths';
+</script>
+
 <svelte:head>
   <title>Einstellungen - HonHon</title>
 </svelte:head>
@@ -5,7 +9,7 @@
 <div class="settings-page">
   <header class="header">
     <h1>⚙️ Einstellungen</h1>
-    <a href="/" class="back-link">← Zurück</a>
+    <a href="{base}/" class="back-link">← Zurück</a>
   </header>
 
   <div class="settings-content">

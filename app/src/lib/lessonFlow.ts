@@ -157,22 +157,37 @@ export class LessonFlowState {
     const config = this.getPhaseConfig(currentPhase);
     const nextPhase = config.nextPhase;
 
-    if (!nextPhase) {
-      return null; // Lesson complete
-    }
+    // Mark the current phase as completed (avoid duplicates)
+    const phasesCompleted = this.currentProgress.phasesCompleted.includes(currentPhase)
+      ? this.currentProgress.phasesCompleted
+      : [...this.currentProgress.phasesCompleted, currentPhase];
 
-    // Update local state FIRST (critical path)
+    // Update local state FIRST (critical path). When there is no next phase,
+    // the lesson is finished: record the final phase as completed and mark
+    // the whole lesson as completed.
     this.currentProgress = {
       ...this.currentProgress,
-      phase: nextPhase,
-      phasesCompleted: [...this.currentProgress.phasesCompleted, currentPhase],
-      currentPhaseProgress: 0
+      phase: nextPhase ?? currentPhase,
+      phasesCompleted,
+      currentPhaseProgress: nextPhase ? 0 : 100,
+      status: nextPhase ? this.currentProgress.status : 'completed',
+      completedAt: nextPhase ? this.currentProgress.completedAt : new Date()
     };
 
     // Try to save to DB (non-blocking, best-effort)
     if (this.progressId) {
       try {
-        await lessonQueries.completePhase(this.progressId, currentPhase, nextPhase);
+        if (nextPhase) {
+          await lessonQueries.completePhase(this.progressId, currentPhase, nextPhase);
+        } else {
+          // Final phase – persist phase completion plus lesson completion
+          await lessonQueries.updateLessonProgress(this.progressId, {
+            phasesCompleted,
+            currentPhaseProgress: 100,
+            status: 'completed',
+            completedAt: new Date()
+          });
+        }
         await this.recordPhaseTime();
       } catch (err) {
         console.warn('Failed to save phase completion to DB:', err);
@@ -237,20 +252,30 @@ export class LessonFlowState {
 
   // Complete entire lesson
   async completeLesson(assessmentScore: number): Promise<void> {
-    if (!this.progressId) return;
-
-    await lessonQueries.completeLesson(this.progressId, assessmentScore);
-    await this.recordPhaseTime();
-
+    // Update local state FIRST (critical path) so the score is retained even
+    // if the DB write fails. Keep the existing best score so a worse retry
+    // doesn't overwrite a previously achieved higher score.
     if (this.currentProgress) {
+      const bestScore = Math.max(assessmentScore, this.currentProgress.assessmentScore || 0);
       this.currentProgress = {
         ...this.currentProgress,
         completedAt: new Date(),
-        assessmentPassed: assessmentScore >= 70,
-        assessmentScore,
+        assessmentPassed: bestScore >= 70,
+        assessmentScore: bestScore,
         status: 'completed',
         phase: 'review'
       };
+    }
+
+    // Try to save to DB (non-blocking, best-effort)
+    if (this.progressId) {
+      try {
+        await lessonQueries.completeLesson(this.progressId, this.currentProgress?.assessmentScore ?? assessmentScore);
+        await this.recordPhaseTime();
+      } catch (err) {
+        console.warn('Failed to save lesson completion to DB:', err);
+        // Continue anyway - local state is what matters
+      }
     }
   }
 
@@ -264,12 +289,24 @@ export class LessonFlowState {
     this.phaseStartTime = Date.now();
   }
 
-  // Record time spent in current phase
+  // Record time spent since the last recording, then reset the marker so the
+  // same elapsed span is never counted twice (the auto-save runs every 30s).
   private async recordPhaseTime(): Promise<void> {
-    if (!this.progressId) return;
+    const now = Date.now();
+    const elapsedSeconds = Math.floor((now - this.phaseStartTime) / 1000);
+    this.phaseStartTime = now;
 
-    const elapsedSeconds = Math.floor((Date.now() - this.phaseStartTime) / 1000);
-    await lessonQueries.addTimeSpent(this.progressId, elapsedSeconds);
+    if (!this.progressId || elapsedSeconds <= 0) return;
+
+    const cappedSeconds = Math.min(elapsedSeconds, 3600);
+    await lessonQueries.addTimeSpent(this.progressId, cappedSeconds);
+
+    if (this.currentProgress) {
+      this.currentProgress = {
+        ...this.currentProgress,
+        timeSpentSeconds: this.currentProgress.timeSpentSeconds + cappedSeconds
+      };
+    }
   }
 
   // Get overall lesson progress percentage

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { base } from '$app/paths';
   import type { Lesson, LessonProgress } from '$lib/types';
 
   interface Props {
@@ -105,7 +106,7 @@
           Bereit weiterzumachen? Gehe zur nächsten Lektion, um auf dem Gelernten aufzubauen.
         </p>
         <div class="actions">
-          <a href="/lektion/{lesson.review.nextLesson}" class="btn-primary">
+          <a href="{base}/lektion/{lesson.review.nextLesson}" class="btn-primary">
             Nächste Lektion →
           </a>
           <button class="btn-secondary" onclick={onComplete}>

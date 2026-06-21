@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getLessonStats, getLessonProgress } from '$lib/db/lessonQueries';
+  import { base } from '$app/paths';
+  import { getLessonStats, getAllLessonProgress } from '$lib/db/lessonQueries';
 
   let stats = $state({
     totalLessons: 12,
@@ -12,6 +13,7 @@
 
   let loading = $state(true);
   let currentLesson = $state<any>(null);
+  let progressMap = $state<Record<string, any>>({});
 
   const lessons = [
     { id: 'lesson-01', number: 1, title: 'Premiers Pas', titleGerman: 'Erste Schritte', description: 'Begrüßungen, être, Aussprache' },
@@ -35,13 +37,27 @@
   async function loadStats() {
     loading = true;
     try {
-      stats = await getLessonStats();
-      currentLesson = await getLessonProgress('lesson-01');
+      const dbStats = await getLessonStats();
+      progressMap = await getAllLessonProgress();
+
+      // Total is the curriculum size, not the number of DB records
+      stats = { ...dbStats, totalLessons: lessons.length };
+
+      // The current lesson is the first one still in progress
+      currentLesson =
+        lessons.map(l => progressMap[l.id]).find(p => p?.status === 'in-progress') || null;
     } catch (error) {
       console.error('Failed to load stats:', error);
     } finally {
       loading = false;
     }
+  }
+
+  // A lesson is unlocked if it's the first one or the previous lesson is completed
+  function isLessonLocked(index: number): boolean {
+    if (index === 0) return false;
+    const previous = lessons[index - 1];
+    return progressMap[previous.id]?.status !== 'completed';
   }
 </script>
 
@@ -99,7 +115,7 @@
     {#if currentLesson && currentLesson.status === 'in-progress'}
       <div class="continue-section">
         <h2>Fortsetzen</h2>
-        <a href="/lektion/{currentLesson.lessonId}" class="continue-card">
+        <a href="{base}/lektion/{currentLesson.lessonId}" class="continue-card">
           <div class="continue-content">
             <span class="continue-label">Lektion {lessons.find(l => l.id === currentLesson.lessonId)?.number}</span>
             <h3>{lessons.find(l => l.id === currentLesson.lessonId)?.titleGerman}</h3>
@@ -117,12 +133,12 @@
     <section class="lessons-section">
       <h2>Alle Lektionen (A1)</h2>
       <div class="lessons-grid">
-        {#each lessons as lesson}
-          {@const progress = lesson.id === currentLesson?.lessonId ? currentLesson : null}
-          {@const isLocked = lesson.locked && !progress}
+        {#each lessons as lesson, index}
+          {@const progress = progressMap[lesson.id] || null}
+          {@const isLocked = isLessonLocked(index) && progress?.status !== 'completed'}
 
           <a
-            href={isLocked ? '#' : `/lektion/${lesson.id}`}
+            href={isLocked ? '#' : `${base}/lektion/${lesson.id}`}
             class="lesson-card"
             class:locked={isLocked}
             class:completed={progress?.status === 'completed'}

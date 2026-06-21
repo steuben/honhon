@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { getAllCards } from '$lib/db/queries';
   import AudioButton from '$lib/components/AudioButton.svelte';
   import type { Card } from '$lib/types';
@@ -31,7 +32,7 @@
 <div class="vocabulary-page">
   <header class="header">
     <h1>📚 Vokabular-Übersicht</h1>
-    <a href="/" class="back-link">← Zurück</a>
+    <a href="{base}/" class="back-link">← Zurück</a>
   </header>
 
   <div class="search-box">

@@ -1,3 +1,7 @@
+<script lang="ts">
+  import { base } from '$app/paths';
+</script>
+
 <svelte:head>
   <title>Fortschritt - HonHon</title>
 </svelte:head>
@@ -5,7 +9,7 @@
 <div class="page-container">
   <h1>📊 Dein Fortschritt</h1>
   <p class="coming-soon">Detaillierte Statistiken kommen bald!</p>
-  <a href="/" class="back-link">← Zurück zum Dashboard</a>
+  <a href="{base}/" class="back-link">← Zurück zum Dashboard</a>
 </div>
 
 <style>

@@ -34,6 +34,16 @@ export async function getLessonProgress(lessonId: string): Promise<LessonProgres
     .first();
 }
 
+// Get progress for every lesson, keyed by lessonId
+export async function getAllLessonProgress(): Promise<Record<string, LessonProgress>> {
+  const all = await db.lessonProgress.toArray();
+  const map: Record<string, LessonProgress> = {};
+  for (const progress of all) {
+    map[progress.lessonId] = progress;
+  }
+  return map;
+}
+
 // Update lesson progress
 export async function updateLessonProgress(
   id: number,
@@ -60,15 +70,19 @@ export async function completePhase(
   });
 }
 
-// Complete entire lesson
+// Complete entire lesson. Keeps the best score so redoing a lesson with a
+// lower result never overwrites a previously achieved higher score.
 export async function completeLesson(
   progressId: number,
   assessmentScore: number
 ): Promise<void> {
+  const existing = await db.lessonProgress.get(progressId);
+  const bestScore = Math.max(assessmentScore, existing?.assessmentScore ?? 0);
+
   await db.lessonProgress.update(progressId, {
     completedAt: new Date(),
-    assessmentPassed: assessmentScore >= 70,
-    assessmentScore,
+    assessmentPassed: bestScore >= 70,
+    assessmentScore: bestScore,
     status: 'completed',
     phase: 'review'
   });

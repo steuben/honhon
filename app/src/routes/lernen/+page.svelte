@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import Flashcard from '$lib/components/Flashcard.svelte';
   import { getNewCards, updateCard, addReview, addSession } from '$lib/db/queries';
   import { calculateSM2, mapResponseToQuality } from '$lib/srs/sm2';
@@ -119,7 +120,7 @@
     <div class="no-cards">
       <h2>Keine neuen Karten verfügbar</h2>
       <p>Du hast alle verfügbaren Karten gelernt!</p>
-      <a href="/" class="back-button">Zurück zum Dashboard</a>
+      <a href="{base}/" class="back-button">Zurück zum Dashboard</a>
     </div>
   {:else}
     <div class="progress-bar-container">

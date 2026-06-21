@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { base } from '$app/paths';
   import { page } from '$app/stores';
   import LessonContainer from '$lib/components/lesson/LessonContainer.svelte';
   import { getLessonById } from '$lib/content/lessons';
@@ -27,7 +28,7 @@
   });
 
   function handleExit() {
-    goto('/');
+    goto(`${base}/`);
   }
 </script>
 
@@ -45,7 +46,7 @@
     <div class="error-screen">
       <h1>⚠️ Fehler</h1>
       <p>{error}</p>
-      <a href="/" class="btn-primary">Zurück zur Übersicht</a>
+      <a href="{base}/" class="btn-primary">Zurück zur Übersicht</a>
     </div>
   {:else if lesson}
     <LessonContainer {lesson} onExit={handleExit} />
